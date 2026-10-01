@@ -12,16 +12,9 @@ service cloud.firestore {
       );
     }
 
-    // Categories
-    match /categories/{categoryId} {
+    // Test doc for connection check
+    match /test/{testId} {
       allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Questions
-    match /questions/{questionId} {
-      allow read: if true;
-      allow write: if isAdmin();
     }
 
     // Groups
@@ -30,11 +23,43 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Game Sessions
-    match /game_sessions/{sessionId} {
+    // Categories and their subcollection questions
+    match /categories/{categoryId} {
       allow read: if true;
-      allow create, update: if true;
+      allow write: if isAdmin();
+
+      match /questions/{questionId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+
+    // Top-level questions (if referenced directly)
+    match /questions/{questionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Sessions and their live reactions subcollection
+    match /sessions/{sessionId} {
+      allow read, create, update: if true;
       allow delete: if isAdmin();
+
+      match /reactions/{reactionId} {
+        allow read, create: if true;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Legacy game_sessions (if referenced)
+    match /game_sessions/{sessionId} {
+      allow read, create, update: if true;
+      allow delete: if isAdmin();
+
+      match /reactions/{reactionId} {
+        allow read, create: if true;
+        allow update, delete: if isAdmin();
+      }
     }
 
     // Settings
@@ -43,7 +68,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Live Reactions & Comments
+    // Live Reactions top-level (if referenced directly)
     match /live_reactions/{reactionId} {
       allow read: if true;
       allow create: if true;

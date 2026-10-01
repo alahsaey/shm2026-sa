@@ -118,6 +118,7 @@ import StatisticsDashboard from './components/StatisticsDashboard';
 import RecentCompetitions from './components/RecentCompetitions';
 import LiveTeamLeaderboard from './components/LiveTeamLeaderboard';
 import AdminAuthModal from './components/AdminAuthModal';
+import { INITIAL_CATEGORIES } from './constants';
 import { aiService, validateAndFixOptions } from './services/aiService';
 import { imageService } from './services/imageService';
 import confetti from 'canvas-confetti';
@@ -329,7 +330,7 @@ export default function App() {
             ...parsed, 
             status: initialStatus as GameState, 
             teams: sanitizedTeams,
-            categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+            categories: (Array.isArray(parsed.categories) && parsed.categories.length > 0) ? parsed.categories : INITIAL_CATEGORIES,
             occupiedSlots: Array.isArray(parsed.occupiedSlots) ? parsed.occupiedSlots : []
           };
         }
@@ -339,10 +340,10 @@ export default function App() {
     }
     return {
       teams: [
-        { id: 'team1', name: '', score: 0, selectedCategories: [], color: '#4f46e5' },
-        { id: 'team2', name: '', score: 0, selectedCategories: [], color: '#10b981' },
+        { id: 'team1', name: 'الفريق الأول', score: 0, selectedCategories: ['prophet', 'nehj', 'zahra'], color: '#4f46e5' },
+        { id: 'team2', name: 'الفريق الثاني', score: 0, selectedCategories: ['imams_history', 'risalat_huquq', 'quran_complete'], color: '#10b981' },
       ],
-      categories: [],
+      categories: INITIAL_CATEGORIES,
       currentTurn: 'team1',
       selectedCategoryId: null,
       selectedQuestionId: null,
@@ -371,8 +372,9 @@ export default function App() {
   const [groups, setGroups] = useState<DBGroup[]>([]);
   
   const selectionGroups = useMemo(() => {
+    const cats = (session?.categories && session.categories.length > 0) ? session.categories : INITIAL_CATEGORIES;
     const existingGroupNames = groups.map(g => g.name);
-    const catGroupNames = Array.from(new Set((session?.categories || []).map(c => c.group || 'عام')));
+    const catGroupNames = Array.from(new Set(cats.map(c => c.group || 'عام')));
     const allNames = Array.from(new Set([...existingGroupNames, ...catGroupNames]));
     return allNames.sort((a, b) => {
       if (a === 'عام') return 1;
@@ -1770,17 +1772,26 @@ export default function App() {
       setDbConnected('connected');
       if (!isMounted) return;
       
-      // Filter out inactive categories
-      const activeCats = dbCats.filter(cat => cat.isActive !== false);
+      // If Firestore has categories, use them; otherwise fallback to INITIAL_CATEGORIES
+      const effectiveCats = (Array.isArray(dbCats) && dbCats.length > 0) ? dbCats : INITIAL_CATEGORIES;
+      const activeCats = effectiveCats.filter(cat => cat.isActive !== false);
+
+      // Auto-seed to Firestore if empty and user is admin
+      if (Array.isArray(dbCats) && dbCats.length === 0 && auth.currentUser?.email?.toLowerCase() === 'alahsaey@gmail.com') {
+        dataService.seedInitialData(INITIAL_CATEGORIES).catch(err => console.warn("Auto-seed notice:", err));
+      }
       
       // Update categories metadata in session
       setSession(prev => {
         if (!prev) return prev;
+        const currentCats = (prev.categories && prev.categories.length > 0) ? prev.categories : INITIAL_CATEGORIES;
         const updatedCategories = activeCats.map(cat => {
-          const existingCat = (prev.categories || []).find(c => c.id === cat.id);
+          const existingCat = currentCats.find(c => c.id === cat.id) || INITIAL_CATEGORIES.find(c => c.id === cat.id);
           return {
             ...cat,
-            questions: existingCat ? (existingCat.questions || []) : []
+            questions: (existingCat && existingCat.questions && existingCat.questions.length > 0)
+              ? existingCat.questions
+              : ((cat as any).questions || [])
           } as Category;
         });
         
@@ -2048,13 +2059,15 @@ export default function App() {
   );
 
   const allActiveCategories = useMemo(() => {
+    const cats = (session.categories && session.categories.length > 0) ? session.categories : INITIAL_CATEGORIES;
     if (session.status === 'selection' || session.status === 'question') {
       const selectedIds = new Set(session.teams.flatMap(t => Array.isArray(t.selectedCategories) ? t.selectedCategories : []));
       if (selectedIds.size > 0) {
-        return session.categories.filter(c => selectedIds.has(c.id));
+        const filtered = cats.filter(c => selectedIds.has(c.id));
+        if (filtered.length > 0) return filtered;
       }
     }
-    return session.categories;
+    return cats;
   }, [session.categories, session.status, teamSelectedCategories]);
 
   const currentTeam = useMemo(() => {
@@ -2062,10 +2075,10 @@ export default function App() {
     return session.teams.find(t => t.id === session.currentTurn) || session.teams[0];
   }, [session?.teams, session?.currentTurn]);
 
-  const selectedCategory = useMemo(() => 
-    session.categories.find(c => c.id === session.selectedCategoryId),
-    [session.categories, session.selectedCategoryId]
-  );
+  const selectedCategory = useMemo(() => {
+    const cats = (session.categories && session.categories.length > 0) ? session.categories : INITIAL_CATEGORIES;
+    return cats.find(c => c.id === session.selectedCategoryId);
+  }, [session.categories, session.selectedCategoryId]);
 
   const selectedQuestion = useMemo(() => {
     const q = selectedCategory?.questions.find(q => q.id === session.selectedQuestionId);
@@ -3981,7 +3994,8 @@ export default function App() {
 
                             <div className="flex-grow space-y-12 pb-24 px-1 w-full lg:max-w-none">
                               {selectionGroups.map((group, gIdx) => {
-                                const groupCategories = session.categories.filter(c => (c.group || 'عام') === group.name);
+                                const cats = (session.categories && session.categories.length > 0) ? session.categories : INITIAL_CATEGORIES;
+                                const groupCategories = cats.filter(c => (c.group || 'عام') === group.name);
                                 if (groupCategories.length === 0) return null;
 
                                 return (
