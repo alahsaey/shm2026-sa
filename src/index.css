@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=Cairo:wght@700;900&family=Almarai:wght@400;700;800&family=Alexandria:wght@400;700;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Alexandria", "Almarai", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Alexandria", sans-serif;
+  
+  --color-bg-deep: #fcfcfc;
+  --color-card-bg: rgba(255, 255, 255, 0.95);
+  --color-accent-blue: #047857;
+  --color-accent-pink: #d97706;
+  --color-accent-gold: #b45309;
+  --color-accent-teal: #065f46;
+  --color-text-main: #111827;
+  --color-text-dim: #4b5563;
+
+  --animate-spin-slow: spin 8s linear infinite;
+
+  /* Dynamic Theme Variables */
+  --theme-primary: var(--app-primary, #4f46e5);
+  --theme-primary-hover: var(--app-primary-hover, #4338ca);
+  --theme-primary-light: var(--app-primary-light, #eef2ff);
+  --theme-glow: var(--app-glow, rgba(79, 70, 229, 0.2));
+  --theme-bg: var(--app-primary-light, #f8fafc);
+}
+
+@utility theme-bg {
+  background-color: var(--theme-primary);
+}
+
+@utility theme-text {
+  color: var(--theme-primary);
+}
+
+@utility theme-border {
+  border-color: var(--theme-primary);
+}
+
+@utility theme-ring {
+  --tw-ring-color: var(--theme-primary);
+}
+
+@utility theme-button {
+  background-color: var(--theme-primary);
+  color: white;
+  &:hover {
+    background-color: var(--theme-primary-hover);
+  }
+}
+
+@utility theme-button-outline {
+  border: 1px solid var(--theme-primary);
+  color: var(--theme-primary);
+  &:hover {
+    background-color: var(--theme-primary-light);
+  }
+}
+
+@layer base {
+  body {
+    background: var(--theme-bg, #fdfdfd);
+    color: #111827;
+    min-height: 100vh;
+    font-family: 'Alexandria', 'Almarai', Cairo, sans-serif;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    transition: background-color 0.5s ease;
+  }
+
+  body::-webkit-scrollbar {
+    width: 12px;
+  }
+  body::-webkit-scrollbar-track {
+    background: #f8fafc;
+  }
+  body::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, #e2e8f0);
+    border-radius: 10px;
+    border: 3px solid #f8fafc;
+  }
+  body::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-primary-hover, #cbd5e1);
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(circle at 30% 30%, var(--theme-primary, rgba(79,70,229,0.05)) 0%, transparent 40%),
+      radial-gradient(circle at 70% 70%, rgba(251, 191, 36, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, var(--theme-primary, rgba(79,70,229,0.02)) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+    animation: backgroundSweep 25s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes backgroundSweep {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(-5%, -5%) rotate(5deg); }
+}
+
+@utility gold-text {
+  background: linear-gradient(135deg, #92400e 0%, #d97706 50%, #92400e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+@utility glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+}
+
+@utility custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-primary, rgba(203, 213, 225, 0.5)) transparent;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+    border: 2px solid white;
+    background-clip: padding-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مسابقة أبوالفواطم</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3407/3407024.png" />
+  </head>
+  <body>
+    <div id="root">
+      <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #f8fafc; font-family: sans-serif;">
+        <div style="width: 60px; height: 60px; border: 5px solid #e2e8f0; border-top: 5px solid #4f46e5; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        <p style="margin-top: 20px; font-weight: bold; color: #475569; direction: rtl;">جاري تحسين الأداء وتحميل المسابقة...</p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Install global error handlers to prevent silent white screen
+      window.addEventListener('error', function(event) {
+        var errorMsg = event.message || (event.error ? event.error.message : 'Unknown load-time error');
+        var errorStack = event.error ? event.error.stack : '';
+        
+        // Only show if it's not a harmless websocket or benign warning
+        if (errorMsg.indexOf('websocket') !== -1 || errorMsg.indexOf('HMR') !== -1) {
+          return;
+        }
+
+        var errorDiv = document.getElementById('global-error-reporter');
+        if (!errorDiv) {
+          errorDiv = document.createElement('div');
+          errorDiv.id = 'global-error-reporter';
+          errorDiv.style.position = 'fixed';
+          errorDiv.style.inset = '0';
+          errorDiv.style.backgroundColor = '#f8fafc';
+          errorDiv.style.color = '#0f172a';
+          errorDiv.style.padding = '24px';
+          errorDiv.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+          errorDiv.style.zIndex = '99999999';
+          errorDiv.style.overflow = 'auto';
+          errorDiv.style.display = 'flex';
+          errorDiv.style.flexDirection = 'column';
+          errorDiv.style.alignItems = 'center';
+          errorDiv.style.justifyContent = 'center';
+          errorDiv.style.boxSizing = 'border-box';
+          errorDiv.style.direction = 'rtl';
+          
+          errorDiv.innerHTML = `
+            <div style="max-width: 600px; width: 100%; bg-color:#fff; background: white; border-radius: 24px; padding: 32px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; text-align: center;">
+              <div style="font-size: 64px; margin-bottom: 16px;">⚠️</div>
+              <h2 style="margin-top: 0; color: #0f172a; font-size: 22px; font-weight: 900; margin-bottom: 12px;">حدث خطأ أثناء تحميل موقع المسابقة</h2>
+              <p style="color: #64748b; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">يرجى المعذرة، واجه المتصفح صعوبة في تشغيل ملفات الموقع بشكل سليم. الإشارة البرمجية للخطأ:</p>
+              <pre style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; overflow: auto; font-size: 13px; text-align: left; direction: ltr; font-family: monospace; color: #334155; max-height: 150px; margin-bottom: 24px;">${errorMsg}\n${errorStack}</pre>
+              <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                <button onclick="window.location.reload();" style="background: #0f172a; color: #fff; border: none; padding: 12px 24px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 14px;">إعادة تحميل الصفحة</button>
+                <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" style="background: #ef4444; color: #fff; border: none; padding: 12px 24px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 14px;">مسح الذاكرة المؤقتة وتشغيل نظيف</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(errorDiv);
+        }
+      });
+
+      // Force unregister all active service workers and clear caches to resolve cache issues
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister().then((success) => {
+              if (success) {
+                console.log('Successfully unregistered service worker');
+              }
+            });
+          }
+        }).catch((err) => {
+          console.error('Error getting service worker registrations:', err);
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          for (const name of names) {
+            caches.delete(name);
+          }
+        }).catch((err) => {
+          console.error('Error clearing caches:', err);
+        });
+      }
+    </script>
+  </body>
+</html>
+

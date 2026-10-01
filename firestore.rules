@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      // Hardcoded admin email as per project context
+      return isVerified() && request.auth.token.email.matches('(?i)alahsaey@gmail\\.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidCategory(cat) {
+      return cat.name is string && cat.name.size() > 0 && cat.name.size() <= 100 &&
+             (cat.get('group', null) == null || (cat.group is string && cat.group.size() <= 50)) &&
+             (cat.get('imageUrl', null) == null || (cat.imageUrl is string && cat.imageUrl.size() <= 500));
+    }
+
+    function isValidQuestion(q) {
+      return q.text is string && q.text.size() > 0 && q.text.size() <= 1000 &&
+             q.answer is string && q.answer.size() > 0 && q.answer.size() <= 500 &&
+             q.points is number && (q.points == 20 || q.points == 40 || q.points == 60) &&
+             q.categoryId is string && isValidId(q.categoryId);
+    }
+
+    function isValidSession(s) {
+      return (s.get('teams', null) == null || (s.teams is list && s.teams.size() <= 10)) &&
+             (s.get('winnerId', null) == null || (s.winnerId is string && isValidId(s.winnerId))) &&
+             (s.get('isCompleted', null) == null || s.isCompleted is bool);
+    }
+
+    function isValidAppSettings(set) {
+      return (set.get('competitionName', null) == null || (set.competitionName is string && set.competitionName.size() <= 200)) &&
+             (set.get('logoUrl', null) == null || (set.logoUrl is string && set.logoUrl.size() <= 1000));
+    }
+
+    // --- Collection Rules ---
+
+    // Categories
+    match /categories/{catId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(catId) && isValidCategory(incoming());
+      allow update: if isAdmin() && isValidCategory(incoming());
+      allow delete: if isAdmin();
+      
+      match /questions/{questionId} {
+        allow read: if true;
+        allow create: if isAdmin() && isValidId(questionId) && isValidQuestion(incoming());
+        allow update: if isAdmin() && isValidQuestion(incoming());
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Groups / Custom Lists
+    match /groups/{groupId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Sessions (History)
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow create: if isValidId(sessionId) && isValidSession(incoming());
+      allow update: if isValidSession(incoming()); // Anyone can update scores during game
+      allow delete: if isAdmin();
+
+      // Subcollection for real-time reactions and comments from contestants
+      match /reactions/{reactionId} {
+        allow read: if true;
+        allow create: if isValidId(sessionId) && isValidId(reactionId) &&
+                        (incoming().get('emoji', null) == null || (incoming().emoji is string && incoming().emoji.size() <= 20)) &&
+                        (incoming().get('comment', null) == null || (incoming().comment is string && incoming().comment.size() <= 200)) &&
+                        (incoming().get('senderName', null) == null || (incoming().senderName is string && incoming().senderName.size() <= 200)) &&
+                        incoming().createdAt is timestamp;
+      }
+    }
+
+    // App Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidAppSettings(incoming());
+    }
+  }
+}

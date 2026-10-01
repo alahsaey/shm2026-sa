@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "A game category like History, Science, etc.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the category" },
+        "group": { "type": "string", "description": "Group for organization (e.g. general, religious)" },
+        "imageUrl": { "type": "string", "description": "Thumbnail image URL" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "A question within a category",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "answer": { "type": "string" },
+        "source": { "type": "string", "description": "Source or reference for the information" },
+        "points": { "type": "number", "enum": [20, 40, 60] },
+        "imageUrl": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "answer", "points", "categoryId"]
+    },
+    "GameSession": {
+      "title": "GameSession",
+      "description": "Log of a game played",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "teams": { 
+          "type": "array",
+          "items": {
+             "type": "object",
+             "properties": {
+               "name": { "type": "string" },
+               "score": { "type": "number" },
+               "color": { "type": "string" },
+               "selectedCategories": { "type": "array", "items": { "type": "string" } }
+             }
+          }
+        },
+        "winnerId": { "type": "string" },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "isCompleted": { "type": "boolean" }
+      }
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global application configuration",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string", "description": "URL of the competition logo" }
+      }
+    },
+    "Reaction": {
+      "title": "Reaction",
+      "description": "An interactive emoji or comment sent by a contestant/viewer",
+      "type": "object",
+      "properties": {
+        "emoji": { "type": "string", "description": "The emoji character sent" },
+        "comment": { "type": "string", "description": "A quick comment or message" },
+        "senderName": { "type": "string", "description": "The display name of the contestant" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["createdAt"]
+    }
+  },
+  "firestore": {
+    "/categories/{catId}": {
+      "schema": "Category",
+      "description": "Main game categories"
+    },
+    "/categories/{catId}/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Questions for a specific category"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "GameSession",
+      "description": "History of played games"
+    },
+    "/sessions/{sessionId}/reactions/{reactionId}": {
+      "schema": "Reaction",
+      "description": "Reactions and comments sent during a game session"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppSettings",
+      "description": "Global application branding settings"
+    }
+  }
+}

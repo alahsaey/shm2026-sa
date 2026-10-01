@@ -1,0 +1,6 @@
+{
+  "name": "مسابقة أبوالفواطم",
+  "description": "منصة مسابقات احترافية وقابلة للتخصيص الكامل، تدعم إدارة الأسئلة، الأقسام، والإحصائيات المتقدمة مع واجهة تفاعلية ذكية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
