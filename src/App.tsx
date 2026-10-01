@@ -54,6 +54,7 @@ import {
   ExternalLink,
   Clock,
   Share2,
+  Tv,
   MonitorPlay,
   Maximize2,
   Minimize2,
@@ -119,6 +120,8 @@ import RecentCompetitions from './components/RecentCompetitions';
 import LiveTeamLeaderboard from './components/LiveTeamLeaderboard';
 import AdminAuthModal from './components/AdminAuthModal';
 import BiometricDeviceManager from './components/BiometricDeviceManager';
+import ChampionshipPodium from './components/ChampionshipPodium';
+import LiveBroadcastTicker from './components/LiveBroadcastTicker';
 import { INITIAL_CATEGORIES } from './constants';
 import { aiService, validateAndFixOptions } from './services/aiService';
 import { imageService } from './services/imageService';
@@ -301,6 +304,22 @@ export default function App() {
   const [isContestantView, setIsContestantView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('mode') === 'interact' || params.get('view') === 'interact';
+  });
+
+  const [isTvMode, setIsTvMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('abf_tv_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [goldenQuestionIds, setGoldenQuestionIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('abf_golden_questions');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
   });
 
   const [persistentSessionId, setPersistentSessionId] = useState<string | null>(() => {
@@ -2119,11 +2138,37 @@ export default function App() {
     } as Question;
   }, [selectedCategory, session.selectedQuestionId]);
 
+  const isCurrentQuestionGolden = useMemo(() => {
+    if (!selectedQuestion) return false;
+    return goldenQuestionIds.includes(selectedQuestion.id);
+  }, [selectedQuestion, goldenQuestionIds]);
+
+  // Ensure random hidden golden surprise questions are chosen
+  useEffect(() => {
+    if (session.categories && session.categories.length > 0 && goldenQuestionIds.length === 0) {
+      const candidates = session.categories.flatMap(c => 
+        (c.questions || []).filter(q => q.points >= 400 && !q.isAnswered).map(q => q.id)
+      );
+      if (candidates.length > 0) {
+        const shuffled = [...candidates].sort(() => 0.5 - Math.random());
+        const picked = shuffled.slice(0, Math.min(3, shuffled.length));
+        setGoldenQuestionIds(picked);
+        try {
+          localStorage.setItem('abf_golden_questions', JSON.stringify(picked));
+        } catch {}
+      }
+    }
+  }, [session.categories, goldenQuestionIds.length]);
+
   const handleSelectQuestion = (categoryId: string, questionId: string) => {
     const category = session.categories.find(c => c.id === categoryId);
     const question = category?.questions.find(q => q.id === questionId);
     
     if (question && !question.isAnswered) {
+      if (goldenQuestionIds.includes(questionId)) {
+        playSound('victory');
+      }
+
       // Mark as played immediately so it doesn't repeat if they back out
       setPlayedQuestionIds(prev => Array.from(new Set([...prev, questionId])));
       
@@ -2267,7 +2312,11 @@ export default function App() {
     setPlayedQuestionIds(prev => Array.from(new Set([...prev, selectedQuestionId])));
 
     const isHintUsed = usedHintQuestionIds.includes(selectedQuestionId);
-    const earnedPoints = isHintUsed ? Math.round(questionPoints * 0.75) : questionPoints;
+    let earnedPoints = isHintUsed ? Math.round(questionPoints * 0.75) : questionPoints;
+    if (goldenQuestionIds.includes(selectedQuestionId)) {
+      earnedPoints = earnedPoints * 2;
+      confetti({ particleCount: 120, spread: 90, origin: { y: 0.6 } });
+    }
 
     const newTeams = (session?.teams || []).map(team => {
       if (isDeduction) {
@@ -2406,6 +2455,8 @@ export default function App() {
     setStartTime(null);
     setUsedHintQuestionIds([]);
     setPersistentSessionId(null);
+    setGoldenQuestionIds([]);
+    try { localStorage.removeItem('abf_golden_questions'); } catch {}
     introPlayed.current = false; // Allow sound to play again on return to welcome
   };
 
@@ -3499,6 +3550,21 @@ export default function App() {
             >
               <Share2 className="w-5 h-5" />
             </button>
+            <div className="w-px h-8 bg-slate-800 mx-1" />
+            <button 
+              onClick={() => {
+                playSound('click');
+                setIsTvMode(prev => {
+                  const next = !prev;
+                  try { localStorage.setItem('abf_tv_mode', String(next)); } catch {}
+                  return next;
+                });
+              }}
+              className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${isTvMode ? 'bg-amber-400 text-slate-950 shadow-lg scale-105' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              title="وضع البث للشاشات والبروجكتر (TV Stage Mode) 📺"
+            >
+              <Tv className="w-6 h-6" />
+            </button>
           </div>
         </div>
 
@@ -3523,7 +3589,22 @@ export default function App() {
         </div>
       </motion.header>
 
-      <main className="relative z-10 w-full flex-grow flex flex-col items-center pt-24 pb-12 px-4">
+      <main className={`relative z-10 w-full flex-grow flex flex-col items-center pt-24 pb-16 px-4 transition-all duration-700 ${isTvMode ? 'bg-slate-950/20' : ''}`}>
+        {/* Dynamic TV Ambient Light */}
+        {isTvMode && (
+          <div 
+            className="fixed inset-0 pointer-events-none z-0 transition-all duration-1000"
+            style={{
+              background: `radial-gradient(circle at 50% 30%, ${
+                timeLeft <= 10 && timerActive 
+                  ? 'rgba(239, 68, 68, 0.16)' 
+                  : isCurrentQuestionGolden
+                    ? 'rgba(245, 158, 11, 0.2)'
+                    : 'rgba(99, 102, 241, 0.12)'
+              } 0%, transparent 70%)`
+            }}
+          />
+        )}
         <div className="w-full max-w-[98%] flex-grow flex flex-col">
           {error ? (
             <div className="w-full max-w-2xl mx-auto py-20 px-8 bg-white border border-rose-100 rounded-[48px] shadow-2xl flex flex-col items-center text-center gap-8 animate-in fade-in zoom-in duration-500">
@@ -4406,8 +4487,27 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 className={`max-w-[98%] mx-auto w-full px-2 md:px-0 flex flex-col transition-all duration-700 ${isFullscreen ? 'pt-4 pb-12' : 'pb-32 pt-0'}`}
               >
-                <div className={`bg-white rounded-[48px] text-center border-4 border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.08)] relative flex-grow transition-all duration-700 ${isFullscreen ? 'p-6 lg:p-10' : 'p-4 lg:p-6'} ${isFullscreen ? 'min-h-[85vh] flex flex-col justify-center' : ''} space-y-4`}>
+                <div className={`bg-white rounded-[48px] text-center border-4 ${
+                  isCurrentQuestionGolden 
+                    ? 'border-amber-400 ring-8 ring-amber-400/20 shadow-[0_0_80px_rgba(245,158,11,0.25)]' 
+                    : 'border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.08)]'
+                } relative flex-grow transition-all duration-700 ${isFullscreen ? 'p-6 lg:p-10' : 'p-4 lg:p-6'} ${isFullscreen ? 'min-h-[85vh] flex flex-col justify-center' : ''} space-y-4`}>
                   <div className="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-accent-blue via-accent-pink to-accent-gold" />
+                  
+                  {/* Golden Question Banner Announcement */}
+                  {isCurrentQuestionGolden && (
+                    <motion.div
+                      initial={{ scale: 0.85, opacity: 0, y: -20 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      className="w-full py-3.5 px-6 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 rounded-2xl font-black text-sm md:text-lg flex items-center justify-center gap-3 shadow-lg shadow-amber-400/30 border-2 border-amber-300 relative z-20"
+                    >
+                      <Sparkles className="w-5 h-5 text-amber-900 animate-spin-slow" />
+                      <span>⭐ سؤال التحدي الذهبي • النقاط مضاعفة (2X)! ⭐</span>
+                      <span className="px-3 py-0.5 bg-slate-950 text-amber-300 rounded-full text-xs font-mono font-black">
+                        {(selectedQuestion?.points || 0) * 2} نقطة
+                      </span>
+                    </motion.div>
+                  )}
                   
                     {/* Branding and Progress in Question View */}
                   <div className="absolute top-8 inset-x-0 flex flex-col items-center gap-2 z-10 pointer-events-none">
@@ -4529,12 +4629,19 @@ export default function App() {
                         <motion.div 
                           initial={{ x: 20, opacity: 0 }}
                           animate={{ x: 0, opacity: 1 }}
-                          className="px-6 py-3 bg-amber-500 text-white rounded-3xl text-lg font-black shadow-xl shadow-amber-100 flex items-center gap-2"
+                          className={`px-6 py-3 rounded-3xl text-lg font-black shadow-xl flex items-center gap-2 ${
+                            isCurrentQuestionGolden 
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 ring-4 ring-amber-300' 
+                              : 'bg-amber-500 text-white shadow-amber-100'
+                          }`}
                         >
-                          <Star className="w-5 h-5 fill-white" />
-                          {selectedQuestion && usedHintQuestionIds.includes(selectedQuestion.id) 
-                            ? Math.round(selectedQuestion.points * 0.75) 
-                            : selectedQuestion?.points} نقطة
+                          <Star className="w-5 h-5 fill-current" />
+                          {(() => {
+                            const basePts = selectedQuestion && usedHintQuestionIds.includes(selectedQuestion.id) 
+                              ? Math.round(selectedQuestion.points * 0.75) 
+                              : (selectedQuestion?.points || 0);
+                            return isCurrentQuestionGolden ? `${basePts * 2} نقطة (مضاعفة 2X ⭐)` : `${basePts} نقطة`;
+                          })()}
                         </motion.div>
                       </div>
                       <div className="h-1.5 w-32 bg-gradient-to-r from-transparent via-indigo-500 to-transparent rounded-full opacity-30" />
@@ -5070,291 +5177,45 @@ export default function App() {
             )}
 
             {(session?.status === 'result') && (
-              <motion.div 
-                key="result"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-6xl mx-auto text-center space-y-12 py-10 pb-32 px-4"
-              >
-                <div className="relative inline-block">
-                  <div className="absolute inset-0 bg-amber-500 blur-[120px] opacity-30 animate-pulse" />
-                  <div className="relative p-16 bg-white rounded-[60px] border-4 border-amber-500 shadow-2xl shadow-amber-200/50 mb-8 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-amber-50/50 to-transparent" />
-                    <img 
-                      src={logoSource} 
-                      alt="Victory Logo" 
-                      className="w-56 h-56 object-contain mx-auto relative z-10 drop-shadow-2xl"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.src = "https://img.icons8.com/color/512/trophy.png";
-                        target.className = "w-48 h-48 opacity-60 mx-auto";
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h2 className="text-6xl font-black text-slate-800 tracking-tighter">نتائج المسابقة</h2>
-                  <div className="flex justify-center gap-6 mt-6">
-                    <div className="px-10 py-5 bg-white rounded-[32px] border-2 border-slate-100 shadow-xl flex items-center gap-6 group hover:border-indigo-100 transition-all">
-                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <RefreshCcw className="w-8 h-8 text-indigo-600 animate-spin-slow" />
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-1">إجمالي الوقت المستغرق</div>
-                        <div className="text-4xl font-black text-slate-800 tracking-tighter">{formatDuration(gameDuration)}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-slate-400 text-xl font-bold mt-8">تحية طيبة لجميع المتسابقين على روحهم الرياضية</p>
-                </div>
-                
-                <div className="space-y-16">
-                  {/* Dynamic Winner Celebration Card */}
-                  {(() => {
-                    const sorted = [...session.teams].sort((a,b) => b.score - a.score);
-                    const topScore = sorted[0].score;
-                    const winners = session.teams.filter(t => t.score === topScore);
-                    const isDraw = winners.length > 1;
-
-                    if (isDraw) {
-                      return (
-                        <motion.div 
-                          initial={{ scale: 0.9, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="bg-white p-16 rounded-[64px] border-8 border-slate-100 shadow-2xl text-center relative overflow-hidden"
-                        >
-                           <div className="absolute inset-0 pointer-events-none z-0">
-                             {[...Array(50)].map((_, i) => {
-                               const angle = (Math.PI * 2 * i) / 50;
-                               const velocity = 300 + Math.random() * 500;
-                               return (
-                                 <motion.div
-                                   key={i}
-                                   initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                                   animate={{ 
-                                     opacity: [0, 1, 1, 0],
-                                     scale: [0, 1.2, 1.2, 0],
-                                     x: Math.cos(angle) * velocity,
-                                     y: Math.sin(angle) * velocity + (Math.random() * 300),
-                                     rotate: 360 * 2 * Math.random()
-                                   }}
-                                   transition={{ duration: 4, repeat: Infinity, delay: Math.random() * 2 }}
-                                   className={`absolute left-1/2 top-1/2 w-4 h-4 ${
-                                     ['bg-amber-400', 'bg-emerald-400', 'bg-indigo-400', 'bg-rose-400', 'bg-sky-400', 'bg-pink-400'][i % 6]
-                                   } ${i % 2 === 0 ? 'rounded-full' : 'rounded-sm rotate-45'}`}
-                                 />
-                               );
-                             })}
-                           </div>
-
-                           <motion.div
-                             animate={{ rotate: [0, 10, -10, 0] }}
-                             transition={{ duration: 5, repeat: Infinity }}
-                             className="relative z-10"
-                           >
-                            <Users className="w-24 h-24 text-slate-300 mx-auto mb-6" />
-                           </motion.div>
-                           <h2 className="text-5xl font-black text-slate-800 mb-4 relative z-10">تعادل الأبطال!</h2>
-                           <div className="flex flex-wrap justify-center gap-4 mb-6 relative z-10">
-                             {winners.map(w => (
-                               <div key={w.id} className="flex items-center gap-2 px-6 py-3 rounded-2xl border-2 bg-white/50 backdrop-blur-sm" style={{ borderColor: `${w.color}40`, color: w.color }}>
-                                 <Star className="w-4 h-4 fill-current" />
-                                 <span className="font-black">{w.name}</span>
-                               </div>
-                             ))}
-                           </div>
-                           <p className="text-slate-400 text-xl font-bold relative z-10">مباراة تاريخية وأداء متكافئ من العمالقة</p>
-                        </motion.div>
-                      );
-                    }
-
-                    const winner = winners[0];
-
-                    return (
-                      <>
-                        <motion.div 
-                        initial={{ y: 50, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        className="p-16 rounded-[64px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] text-center relative overflow-hidden border-8 border-slate-100 bg-white z-10"
-                      >
-                        <div className="absolute inset-0 pointer-events-none z-0">
-                           {[...Array(60)].map((_, i) => {
-                             const angle = (Math.PI * 2 * i) / 60;
-                             const velocity = 350 + Math.random() * 600;
-                             return (
-                               <motion.div
-                                 key={i}
-                                 initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                                 animate={{ 
-                                   opacity: [0, 1, 1, 0],
-                                   scale: [0, 1.4, 1.4, 0],
-                                   x: Math.cos(angle) * velocity,
-                                   y: Math.sin(angle) * velocity + (Math.random() * 400),
-                                   rotate: 360 * 3 * Math.random()
-                                 }}
-                                 transition={{ duration: 5, repeat: Infinity, delay: Math.random() * 2 }}
-                                 className={`absolute left-1/2 top-1/2 w-4 h-4 ${
-                                   ['bg-amber-400', 'bg-emerald-400', 'bg-indigo-400', 'bg-rose-400', 'bg-sky-400', 'bg-pink-400'][i % 6]
-                                 } ${i % 2 === 0 ? 'rounded-full' : 'rounded-sm rotate-45'}`}
-                               />
-                             );
-                           })}
-                         </div>
-
-                        <motion.div 
-                          animate={{ scale: [1, 1.2, 1], opacity: [0.05, 0.1, 0.05], rotate: 360 }}
-                          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                          className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-[100px] pointer-events-none" 
-                          style={{ backgroundColor: winner.color }}
-                        />
-
-
-                          <motion.div 
-                            animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1], rotate: 360 }}
-                            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                            className="absolute -top-24 -left-24 w-96 h-96 bg-white rounded-full blur-[100px] pointer-events-none" 
-                          />
-                        <div className="relative z-10 flex flex-col items-center">
-                          <motion.div
-                            initial={{ scale: 0, rotate: -45 }}
-                            animate={{ scale: 1.1, rotate: 0 }}
-                            transition={{ type: "spring", bounce: 0.6, delay: 0.2 }}
-                            className="mb-8 p-10 bg-slate-50 border-4 border-white rounded-[48px] shadow-2xl cursor-pointer hover:scale-105 transition-transform"
-                            style={{ color: winner.color }}
-                          >
-                            <Trophy className="w-32 h-32 drop-shadow-[0_10px_20px_rgba(0,0,0,0.1)]" />
-                          </motion.div>
-                          
-                          <motion.span 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.5 }}
-                            className="text-slate-400 font-black text-xl uppercase tracking-[0.4em] mb-4"
-                          >
-                            بطل المسابقة
-                          </motion.span>
-                          
-                          <motion.h1 
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.6 }}
-                            className="text-8xl font-black mb-8 drop-shadow-xl tracking-tighter"
-                            style={{ color: winner.color }}
-                          >
-                            {winner.name}
-                          </motion.h1>
-
-                           <motion.div 
-                             initial={{ y: 20, opacity: 0 }}
-                             animate={{ y: 0, opacity: 1 }}
-                             transition={{ delay: 0.8 }}
-                             className="flex flex-col items-center gap-6"
-                           >
-                             <div className="text-left py-6 px-12 bg-white border-2 border-slate-50 rounded-[40px] shadow-xl">
-                                <span className="block text-slate-400 text-xs font-black uppercase tracking-widest leading-none mb-2 text-center">الرصيد النهائي</span>
-                                <div className="flex items-center gap-4">
-                                  <Star className="w-8 h-8 text-amber-400 fill-current" />
-                                  <span className="text-7xl font-black text-slate-900 tracking-widest leading-none" style={{ color: winner.color }}>{winner.score}</span>
-                                </div>
-                             </div>
-                            </motion.div>
-                          </div>
-                        </motion.div>
-
-                       </>
-                    );
-                  })()}
-                </div>
-
-                <div className="grid gap-6 max-w-2xl mx-auto">
-                  <h3 className="text-xl font-black text-slate-400 uppercase tracking-widest text-center mb-2">الترتيب العام</h3>
-                  {session.teams
-                    .slice()
-                    .sort((a,b) => b.score - a.score)
-                    .map((team, idx) => {
-                      return (
-                        <motion.div 
-                          key={team.id} 
-                          initial={{ x: -20, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 1 + (idx * 0.1) }}
-                          className={`p-8 rounded-[32px] border-2 transition-all shadow-xl bg-white flex items-center justify-between`}
-                          style={{ borderColor: `${team.color}40` }}
-                        >
-                          <div className="flex items-center gap-6">
-                            <span className="text-2xl font-black text-slate-300">#{idx + 1}</span>
-                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-xl" style={{ backgroundColor: team.color }}>
-                              {team.name.charAt(0)}
-                            </div>
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-2xl font-black text-slate-900 tracking-tight">{team.name}</span>
-                            <div className="w-12 h-1 bg-current opacity-20 rounded-full" style={{ color: team.color }} />
-                          </div>
-                          </div>
-                          <span className="text-4xl font-black text-slate-900" style={{ color: team.color }}>{team.score}</span>
-                        </motion.div>
-                      );
-                    })}
-                </div>
-
-                {/* Question Auto-Generation Status Panel */}
-                {(isRegenerating || regSuccess || regError) && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-2xl mx-auto p-8 rounded-[32px] border bg-white flex flex-col gap-4 text-right shadow-xl relative overflow-hidden" 
-                    style={{ borderColor: regError ? '#fee2e2' : regSuccess ? '#bbf7d0' : '#e2e8f0' }}
-                  >
-                    <div className="flex items-center gap-6 justify-between flex-row-reverse">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${regError ? 'bg-red-50 text-red-500' : regSuccess ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-indigo-600'}`}>
-                        {regError ? <XCircle className="w-8 h-8" /> : regSuccess ? <CheckCircle2 className="w-8 h-8 animate-bounce" /> : <RefreshCcw className="w-8 h-8 animate-spin" />}
-                      </div>
-                      <div className="flex-1 text-right">
-                        <h4 className="text-xl font-bold text-slate-800">التحديث التلقائي لأسئلة الجولة الجديدة</h4>
-                        <p className={`text-md mt-1 font-bold ${regError ? 'text-red-500 font-bold' : regSuccess ? 'text-green-600 font-bold' : 'text-indigo-600 dark:text-indigo-500 font-bold'}`}>
-                          {regProgress || regError}
-                        </p>
-                      </div>
-                    </div>
-                    {isRegenerating && (
-                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2 relative">
-                        <motion.div 
-                          className="bg-indigo-600 h-full rounded-full" 
-                          animate={{ 
-                            left: ["0%", "100%"],
-                            width: ["30%", "10%"]
-                          }}
-                          transition={{ 
-                            repeat: Infinity, 
-                            duration: 1.5,
-                            ease: "easeInOut"
-                          }}
-                          style={{ position: 'absolute' }}
-                        />
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-                <div className="flex justify-center pt-8">
-                  <button 
-                    disabled={isRegenerating}
-                    onClick={() => { playSound('click'); resetGame(); }}
-                    className={`px-12 py-5 bg-white border-2 border-slate-200 hover:bg-slate-50 rounded-2xl flex items-center justify-center gap-4 transition-all font-black text-xl text-slate-700 shadow-xl shadow-slate-100 ${isRegenerating ? 'opacity-40 cursor-not-allowed select-none bg-slate-50 border-slate-200' : ''}`}
-                  >
-                    {isRegenerating ? <RefreshCcw className="w-6 h-6 animate-spin text-slate-400" /> : <RotateCcw className="w-6 h-6" />}
-                    مباراة جديدة
-                  </button>
-                </div>
-              </motion.div>
+              <ChampionshipPodium
+                teams={session.teams}
+                gameDuration={gameDuration}
+                competitionName={competitionName}
+                competitionSlogan={competitionSlogan}
+                onNewGame={resetGame}
+                isRegenerating={isRegenerating}
+                regProgress={regProgress}
+                regError={regError}
+                regSuccess={regSuccess}
+                playSound={playSound}
+              />
             )}
           </AnimatePresence>
         </>
       )}
     </div>
   </main>
+
+      {/* Live Broadcast Ticker for TV/Projector & Game Stages */}
+      {(session?.status === 'selection' || session?.status === 'question') && (
+        <LiveBroadcastTicker
+          teams={session.teams}
+          currentTurnId={session.currentTurn}
+          competitionName={competitionName}
+          activeCategory={selectedCategory}
+          activeQuestion={selectedQuestion}
+          timeLeft={timeLeft}
+          isTvMode={isTvMode}
+          onToggleTvMode={() => {
+            playSound('click');
+            setIsTvMode(prev => {
+              const next = !prev;
+              try { localStorage.setItem('abf_tv_mode', String(next)); } catch {}
+              return next;
+            });
+          }}
+        />
+      )}
 
       <footer className={`w-full py-8 text-center shrink-0 mt-20 border-t border-slate-100 bg-white/50 backdrop-blur-sm transition-all duration-500 ${isFullscreen && session.status === 'question' ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <p className="text-sm font-black text-slate-600 tracking-tight">
