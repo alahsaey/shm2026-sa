@@ -88,6 +88,8 @@ import {
   Printer, 
   Rocket, 
   Shield, 
+  ShieldAlert,
+  Fingerprint,
   ShoppingBag, 
   Smartphone, 
   Sun, 
@@ -115,6 +117,7 @@ import AdminDashboard from './components/AdminDashboard';
 import StatisticsDashboard from './components/StatisticsDashboard';
 import RecentCompetitions from './components/RecentCompetitions';
 import LiveTeamLeaderboard from './components/LiveTeamLeaderboard';
+import AdminAuthModal from './components/AdminAuthModal';
 import { aiService, validateAndFixOptions } from './services/aiService';
 import { imageService } from './services/imageService';
 import confetti from 'canvas-confetti';
@@ -285,6 +288,7 @@ export default function App() {
   const [rollingComments, setRollingComments] = useState<{ id: string; comment: string; senderName?: string }[]>([]);
   const [showReactionsSelector, setShowReactionsSelector] = useState(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
   const [isContestantView, setIsContestantView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('mode') === 'interact' || params.get('view') === 'interact';
@@ -1619,7 +1623,7 @@ export default function App() {
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setIsAdmin(u?.email === 'alahsaey@gmail.com');
+      setIsAdmin(u?.email?.toLowerCase() === 'alahsaey@gmail.com');
     });
   }, []);
 
@@ -2882,16 +2886,16 @@ export default function App() {
                 
                 {!user ? (
                   <button 
-                    onClick={() => { setShowSettings(false); handleLogin(); }}
+                    onClick={() => { setShowSettings(false); setShowAdminAuthModal(true); }}
                     className="w-full p-6 bg-slate-900 text-white rounded-3xl flex items-center justify-between group hover:bg-black transition-all shadow-xl"
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                        <Lock className="w-6 h-6 text-rose-400" />
+                        <Lock className="w-6 h-6 text-amber-400" />
                       </div>
                       <div className="text-right">
-                        <p className="font-black">دخول كمسؤول</p>
-                        <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-0.5">لوحة التحكم والمزامنة الذكية</p>
+                        <p className="font-black">دخول كمسؤول (بالبصمة / Google)</p>
+                        <p className="text-[10px] text-amber-300/80 font-bold uppercase tracking-widest mt-0.5">حماية حصرية لـ alahsaey@gmail.com</p>
                       </div>
                     </div>
                     <ChevronLeft className="w-6 h-6 text-white/30 group-hover:translate-x-[-10px] transition-transform" />
@@ -2914,22 +2918,34 @@ export default function App() {
                         </div>
                       </div>
                       {isAdmin ? (
-                        <div className="px-3 py-1 bg-amber-500 text-white text-[9px] font-black rounded-lg shadow-md uppercase tracking-widest">مسؤول</div>
+                        <div className="px-3 py-1 bg-amber-500 text-white text-[9px] font-black rounded-lg shadow-md uppercase tracking-widest">مسؤول معتمد</div>
                       ) : (
-                        <div className="px-3 py-1 bg-slate-200 text-slate-500 text-[9px] font-black rounded-lg uppercase tracking-widest">ضيف</div>
+                        <div className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-lg uppercase tracking-widest">غير مصرح لـ {user.email}</div>
                       )}
                     </div>
+
+                    {!isAdmin && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] font-bold text-amber-800 text-right">
+                        ⚠️ الصلاحيات محصورة حصرياً للبريد المعتمد alahsaey@gmail.com.
+                      </div>
+                    )}
                     
                     <div className="grid grid-cols-2 gap-3">
-                      {isAdmin && (
-                        <button 
-                          onClick={() => { setShowSettings(false); setView('admin'); }}
-                          className="p-5 bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-primary-hover)] text-white rounded-[24px] flex flex-col items-center gap-3 shadow-xl shadow-[var(--theme-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all"
-                        >
-                          <Database className="w-6 h-6" />
-                          <span className="text-sm font-black">لوحة التحكم</span>
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => { 
+                          setShowSettings(false); 
+                          if (isAdmin) {
+                            setView('admin'); 
+                          } else {
+                            setShowAdminAuthModal(true);
+                          }
+                        }}
+                        className="p-5 bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-primary-hover)] text-white rounded-[24px] flex flex-col items-center gap-3 shadow-xl shadow-[var(--theme-glow)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        <Database className="w-6 h-6" />
+                        <span className="text-sm font-black">{isAdmin ? 'لوحة التحكم' : 'طلب دخول المسؤول'}</span>
+                      </button>
+
                       {isAdmin && (
                         <button 
                           onClick={() => { setShowSettings(false); setView('stats'); }}
@@ -2964,7 +2980,48 @@ export default function App() {
     </AnimatePresence>
   );
 
-  if (view === 'admin' && isAdmin) {
+  if (view === 'admin') {
+    if (!isAdmin) {
+      return (
+        <div dir="rtl" className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-24 h-24 bg-rose-500/20 border-2 border-rose-500 text-rose-400 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-rose-500/20 animate-pulse">
+            <ShieldAlert className="w-12 h-12" />
+          </div>
+          <span className="px-3.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-full text-xs font-black uppercase tracking-widest mb-3">
+            منطقة أمنية محظورة - حظر المتطفلين
+          </span>
+          <h2 className="text-3xl md:text-4xl font-black mb-3 text-white">غير مصرح لك بدخول لوحة التحكم</h2>
+          <p className="text-slate-400 max-w-md text-sm md:text-base font-semibold mb-8 leading-relaxed">
+            تم تقييد كافة صلاحيات الإدارة حكراً وحصرياً لصاحب البريد الإلكتروني المعتمد (<strong className="text-amber-300">alahsaey@gmail.com</strong>) مع تفعيل المصادقة البيومترية بالبصمة.
+          </p>
+          <div className="flex flex-wrap gap-4 justify-center">
+            <button 
+              onClick={() => { playSound('click'); setShowAdminAuthModal(true); }}
+              className="px-8 py-4 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 rounded-2xl font-black flex items-center gap-2 shadow-xl hover:scale-105 transition-all cursor-pointer"
+            >
+              <Lock className="w-5 h-5" />
+              المصادقة بالبصمة / حساب المسؤول
+            </button>
+            <button 
+              onClick={() => { playSound('click'); setView('game'); }}
+              className="px-6 py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold transition-all cursor-pointer"
+            >
+              العودة للمسابقة
+            </button>
+          </div>
+
+          <AdminAuthModal
+            isOpen={showAdminAuthModal}
+            onClose={() => setShowAdminAuthModal(false)}
+            onSuccess={() => { setShowAdminAuthModal(false); setView('admin'); }}
+            currentUser={user}
+            isAdmin={isAdmin}
+            playSound={playSound}
+          />
+        </div>
+      );
+    }
+
     const sessionAnsweredIds = (session?.categories || []).flatMap(c => (c.questions || []).filter(q => q.isAnswered).map(q => q.id));
     const allAnsweredIds = Array.from(new Set([...sessionAnsweredIds, ...(Array.isArray(playedQuestionIds) ? playedQuestionIds : [])]));
     return (
@@ -3039,6 +3096,14 @@ export default function App() {
           playSound={playSound}
         />
       )}
+      <AdminAuthModal
+        isOpen={showAdminAuthModal}
+        onClose={() => setShowAdminAuthModal(false)}
+        onSuccess={() => { setShowAdminAuthModal(false); setView('admin'); }}
+        currentUser={user}
+        isAdmin={isAdmin}
+        playSound={playSound}
+      />
 
       {/* Absolute overlay for flying reactions (emojis) */}
       <div className="fixed inset-0 pointer-events-none z-[80] overflow-hidden">
