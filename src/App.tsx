@@ -110,7 +110,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { auth, signInWithGoogle } from './lib/firebase';
+import { auth, signInWithGoogle, getAuthErrorMessage } from './lib/firebase';
 import { dataService, DBGroup } from './lib/dataService';
 import { GameSession, Team, Category, Question, GameState } from './types.ts';
 import AdminDashboard from './components/AdminDashboard';
@@ -1637,15 +1637,10 @@ export default function App() {
       await signInWithGoogle();
     } catch (err: any) {
       if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
-        console.log("Login popup closed or cancelled by user.");
         return;
       }
-      console.error("Login failed:", err);
-      if (err.code === 'auth/popup-blocked') {
-        setLoginError("تم حظر النافذة المنبثقة. يرجى تفعيل النوافذ المنبثقة في متصفحك للمتابعة.");
-      } else {
-        setLoginError("حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.");
-      }
+      const msg = getAuthErrorMessage(err);
+      setLoginError(msg);
     } finally {
       setIsLoggingIn(false);
     }

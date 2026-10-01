@@ -2,96 +2,63 @@
   "entities": {
     "Category": {
       "title": "Category",
-      "description": "A game category like History, Science, etc.",
+      "description": "Competition Category",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Display name of the category" },
-        "group": { "type": "string", "description": "Group for organization (e.g. general, religious)" },
-        "imageUrl": { "type": "string", "description": "Thumbnail image URL" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" }
       },
       "required": ["name"]
     },
     "Question": {
       "title": "Question",
-      "description": "A question within a category",
+      "description": "Category Question",
       "type": "object",
       "properties": {
+        "categoryId": { "type": "string" },
         "text": { "type": "string" },
         "answer": { "type": "string" },
-        "source": { "type": "string", "description": "Source or reference for the information" },
-        "points": { "type": "number", "enum": [20, 40, 60] },
-        "imageUrl": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "points": { "type": "number" }
       },
-      "required": ["text", "answer", "points", "categoryId"]
+      "required": ["categoryId", "text", "answer", "points"]
     },
     "GameSession": {
       "title": "GameSession",
-      "description": "Log of a game played",
+      "description": "Game Session History",
       "type": "object",
       "properties": {
-        "createdAt": { "type": "string", "format": "date-time" },
-        "teams": { 
-          "type": "array",
-          "items": {
-             "type": "object",
-             "properties": {
-               "name": { "type": "string" },
-               "score": { "type": "number" },
-               "color": { "type": "string" },
-               "selectedCategories": { "type": "array", "items": { "type": "string" } }
-             }
-          }
-        },
-        "winnerId": { "type": "string" },
-        "categories": { "type": "array", "items": { "type": "string" } },
-        "duration": { "type": "number", "description": "Duration in seconds" },
+        "creatorId": { "type": "string" },
         "isCompleted": { "type": "boolean" }
       }
     },
     "AppSettings": {
       "title": "AppSettings",
-      "description": "Global application configuration",
+      "description": "Global Application Settings",
       "type": "object",
       "properties": {
-        "logoUrl": { "type": "string", "description": "URL of the competition logo" }
+        "competitionName": { "type": "string" }
       }
-    },
-    "Reaction": {
-      "title": "Reaction",
-      "description": "An interactive emoji or comment sent by a contestant/viewer",
-      "type": "object",
-      "properties": {
-        "emoji": { "type": "string", "description": "The emoji character sent" },
-        "comment": { "type": "string", "description": "A quick comment or message" },
-        "senderName": { "type": "string", "description": "The display name of the contestant" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["createdAt"]
     }
   },
   "firestore": {
-    "/categories/{catId}": {
-      "schema": "Category",
-      "description": "Main game categories"
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "List of categories"
     },
-    "/categories/{catId}/questions/{questionId}": {
-      "schema": "Question",
-      "description": "Questions for a specific category"
+    "/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/Question" },
+      "description": "List of questions"
     },
-    "/sessions/{sessionId}": {
-      "schema": "GameSession",
-      "description": "History of played games"
+    "/game_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/GameSession" },
+      "description": "Recorded game sessions"
     },
-    "/sessions/{sessionId}/reactions/{reactionId}": {
-      "schema": "Reaction",
-      "description": "Reactions and comments sent during a game session"
-    },
-    "/settings/{settingId}": {
-      "schema": "AppSettings",
-      "description": "Global application branding settings"
+    "/settings/{settingsId}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Global app settings"
     }
   }
 }

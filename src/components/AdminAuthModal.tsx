@@ -17,7 +17,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { User, signOut } from 'firebase/auth';
-import { auth, signInWithGoogle } from '../lib/firebase';
+import { auth, signInWithGoogle, getAuthErrorMessage } from '../lib/firebase';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -87,12 +87,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
         return;
       }
-      console.error("Google Admin Sign-in Error:", err);
-      if (err?.code === 'auth/popup-blocked') {
-        setLoginError("تم حظر النافذة المنبثقة من قبل المتصفح. يرجى تفعيل النوافذ المنبثقة للمتابعة.");
-      } else {
-        setLoginError("حدث خطأ أثناء تسجيل الدخول عبر Google. يرجى المحاولة لاحقاً.");
-      }
+      const msg = getAuthErrorMessage(err);
+      setLoginError(msg);
     } finally {
       setIsLoggingIn(false);
     }
