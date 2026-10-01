@@ -113,6 +113,7 @@ import {
 import { dataService, DBCategory, DBQuestion, DBGroup } from '../lib/dataService';
 import { auth } from '../lib/firebase';
 import { serverTimestamp } from 'firebase/firestore';
+import BiometricDeviceManager from './BiometricDeviceManager';
 import { INITIAL_CATEGORIES } from '../constants';
 import { aiService } from '../services/aiService';
 
@@ -4678,6 +4679,11 @@ export default function AdminDashboard({ onBack, answeredQuestionIds = [], onRes
           {loading ? <Loader2 className="w-6 h-6 animate-spin text-[var(--app-primary)]" /> : <Save className="w-6 h-6 text-[var(--app-primary)]" />}
           <span>حفظ الهوية الجديدة</span>
         </motion.button>
+      </div>
+
+      {/* Biometric Device Security Card */}
+      <div className="w-full">
+        <BiometricDeviceManager playSound={playSound} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">

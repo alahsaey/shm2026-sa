@@ -118,6 +118,7 @@ import StatisticsDashboard from './components/StatisticsDashboard';
 import RecentCompetitions from './components/RecentCompetitions';
 import LiveTeamLeaderboard from './components/LiveTeamLeaderboard';
 import AdminAuthModal from './components/AdminAuthModal';
+import BiometricDeviceManager from './components/BiometricDeviceManager';
 import { INITIAL_CATEGORIES } from './constants';
 import { aiService, validateAndFixOptions } from './services/aiService';
 import { imageService } from './services/imageService';
@@ -279,7 +280,14 @@ export default function App() {
 
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<'game' | 'admin' | 'stats' | 'recent'>('game');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('abf_admin_authenticated') === 'true' || 
+             localStorage.getItem('abf_admin_authenticated') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1625,7 +1633,21 @@ export default function App() {
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setIsAdmin(u?.email?.toLowerCase() === 'alahsaey@gmail.com');
+      if (u) {
+        if (u.email?.toLowerCase() === 'alahsaey@gmail.com') {
+          setIsAdmin(true);
+          try {
+            sessionStorage.setItem('abf_admin_authenticated', 'true');
+            localStorage.setItem('abf_admin_authenticated', 'true');
+          } catch {}
+        }
+      } else {
+        const isPersisted = sessionStorage.getItem('abf_admin_authenticated') === 'true' || 
+                            localStorage.getItem('abf_admin_authenticated') === 'true';
+        if (isPersisted) {
+          setIsAdmin(true);
+        }
+      }
     });
   }, []);
 
@@ -2892,7 +2914,7 @@ export default function App() {
                   <h3 className="text-lg font-black text-slate-800">الحساب والإدارة</h3>
                 </div>
                 
-                {!user ? (
+                {!user && !isAdmin ? (
                   <button 
                     onClick={() => { setShowSettings(false); setShowAdminAuthModal(true); }}
                     className="w-full p-6 bg-slate-900 text-white rounded-3xl flex items-center justify-between group hover:bg-black transition-all shadow-xl"
@@ -2909,26 +2931,26 @@ export default function App() {
                     <ChevronLeft className="w-6 h-6 text-white/30 group-hover:translate-x-[-10px] transition-transform" />
                   </button>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="relative">
                            <img 
-                              src={user.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.uid}`} 
+                              src={user?.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.uid || 'admin'}`} 
                               className="w-12 h-12 rounded-2xl border-2 border-white shadow-md"
                               alt="User"
                            />
                            {isAdmin && <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 text-white rounded-lg flex items-center justify-center shadow-lg transform rotate-12 border-2 border-white"><Trophy className="w-3 h-3" /></div>}
                         </div>
                         <div className="text-right">
-                          <p className="font-black text-slate-900">{user.displayName || 'مستخدم'}</p>
-                          <p className="text-[10px] text-slate-400 font-bold line-clamp-1">{user.email}</p>
+                          <p className="font-black text-slate-900">{user?.displayName || 'مسؤول النظام المعتمد'}</p>
+                          <p className="text-[10px] text-slate-400 font-bold line-clamp-1">{user?.email || 'alahsaey@gmail.com'}</p>
                         </div>
                       </div>
                       {isAdmin ? (
                         <div className="px-3 py-1 bg-amber-500 text-white text-[9px] font-black rounded-lg shadow-md uppercase tracking-widest">مسؤول معتمد</div>
                       ) : (
-                        <div className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-lg uppercase tracking-widest">غير مصرح لـ {user.email}</div>
+                        <div className="px-3 py-1 bg-rose-100 text-rose-600 text-[9px] font-black rounded-lg uppercase tracking-widest">غير مصرح لـ {user?.email}</div>
                       )}
                     </div>
 
@@ -2936,6 +2958,11 @@ export default function App() {
                       <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] font-bold text-amber-800 text-right">
                         ⚠️ الصلاحيات محصورة حصرياً للبريد المعتمد alahsaey@gmail.com.
                       </div>
+                    )}
+
+                    {/* Biometric Device Activation Card */}
+                    {isAdmin && (
+                      <BiometricDeviceManager playSound={playSound} />
                     )}
                     
                     <div className="grid grid-cols-2 gap-3">
@@ -2966,7 +2993,16 @@ export default function App() {
                     </div>
 
                     <button 
-                      onClick={() => { playSound('click'); signOut(auth); setShowSettings(false); }}
+                      onClick={() => { 
+                        playSound('click'); 
+                        signOut(auth); 
+                        setIsAdmin(false);
+                        try {
+                          sessionStorage.removeItem('abf_admin_authenticated');
+                          localStorage.removeItem('abf_admin_authenticated');
+                        } catch {}
+                        setShowSettings(false); 
+                      }}
                       className="w-full h-14 bg-rose-50 text-rose-500 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-rose-100 transition-all border border-rose-100"
                     >
                       <LogOut className="w-5 h-5" />
@@ -3021,7 +3057,15 @@ export default function App() {
           <AdminAuthModal
             isOpen={showAdminAuthModal}
             onClose={() => setShowAdminAuthModal(false)}
-            onSuccess={() => { setShowAdminAuthModal(false); setView('admin'); }}
+            onSuccess={() => { 
+              setIsAdmin(true);
+              try {
+                sessionStorage.setItem('abf_admin_authenticated', 'true');
+                localStorage.setItem('abf_admin_authenticated', 'true');
+              } catch {}
+              setShowAdminAuthModal(false); 
+              setView('admin'); 
+            }}
             currentUser={user}
             isAdmin={isAdmin}
             playSound={playSound}
@@ -3107,7 +3151,15 @@ export default function App() {
       <AdminAuthModal
         isOpen={showAdminAuthModal}
         onClose={() => setShowAdminAuthModal(false)}
-        onSuccess={() => { setShowAdminAuthModal(false); setView('admin'); }}
+        onSuccess={() => { 
+          setIsAdmin(true);
+          try {
+            sessionStorage.setItem('abf_admin_authenticated', 'true');
+            localStorage.setItem('abf_admin_authenticated', 'true');
+          } catch {}
+          setShowAdminAuthModal(false); 
+          setView('admin'); 
+        }}
         currentUser={user}
         isAdmin={isAdmin}
         playSound={playSound}
